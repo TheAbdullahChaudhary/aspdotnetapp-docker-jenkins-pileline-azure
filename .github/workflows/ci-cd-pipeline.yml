@@ -1,0 +1,52 @@
+name: Build and Deploy Docker Image
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build Docker image
+      run: |
+        docker build -t ${{ secrets.DOCKER_USERNAME }}/aspdotnetapp:latest .
+
+    - name: Push Docker image to Docker Hub
+      run: |
+        docker push ${{ secrets.DOCKER_USERNAME }}/aspdotnetapp:latest
+
+    - name: Setup SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.DEV_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H ${{ secrets.DEV_EC2_HOST }} >> ~/.ssh/known_hosts
+
+    - name: Deploy to AWS EC2
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_REGION: ${{ secrets.AWS_REGION }}
+        DEV_EC2_HOST: ${{ secrets.DEV_EC2_HOST }}
+      run: |
+        ssh -o StrictHostKeyChecking=no ubuntu@$DEV_EC2_HOST << 'EOF'
+          sudo docker pull ${{ secrets.DOCKER_USERNAME }}/aspdotnetapp:latest
+          sudo docker stop aspdotnetapp || true
+          sudo docker rm aspdotnetapp || true
+          sudo docker run -d --name aspdotnetapp -p 8081:8081 ${{ secrets.DOCKER_USERNAME }}/aspdotnetapp:latest
+        EOF
