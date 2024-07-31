@@ -24,13 +24,11 @@ jobs:
 
     - name: Build Docker image
       run: |
-        IMAGE_TAG="aspdotnetapp:${{ github.sha }}"
-        docker build -t $IMAGE_TAG .
-        echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
+        docker build -t ${{ secrets.DOCKER_USERNAME }}/aspdotnetapp:latest .
 
     - name: Push Docker image to Docker Hub
       run: |
-        docker push ${{ env.IMAGE_TAG }}
+        docker push ${{ secrets.DOCKER_USERNAME }}/aspdotnetapp:latest
 
     - name: Setup SSH
       run: |
@@ -47,9 +45,8 @@ jobs:
         DEV_EC2_HOST: ${{ secrets.DEV_EC2_HOST }}
       run: |
         ssh -o StrictHostKeyChecking=no ubuntu@$DEV_EC2_HOST << 'EOF'
-          IMAGE_TAG="aspdotnetapp:${{ github.sha }}"
-          sudo docker pull $IMAGE_TAG
-          sudo docker stop my-app || true
-          sudo docker rm my-app || true
-          sudo docker run -d --name my-app -p 80:80 $IMAGE_TAG
+          sudo docker pull ${{ secrets.DOCKER_USERNAME }}/aspdotnetapp:latest
+          sudo docker stop aspdotnetapp || true
+          sudo docker rm aspdotnetapp || true
+          sudo docker run -d --name aspdotnetapp -p 80:80 ${{ secrets.DOCKER_USERNAME }}/aspdotnetapp:latest
         EOF
