@@ -48,5 +48,5 @@ jobs:
           sudo docker pull ${{ secrets.DOCKER_USERNAME }}/aspdotnetapp:latest
           sudo docker stop aspdotnetapp || true
           sudo docker rm aspdotnetapp || true
-          sudo docker run -d --name aspdotnetapp -p 80:80 ${{ secrets.DOCKER_USERNAME }}/aspdotnetapp:latest
+          sudo docker run -d --name aspdotnetapp -p 8080:8080 ${{ secrets.DOCKER_USERNAME }}/aspdotnetapp:latest
         EOF
