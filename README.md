@@ -1,143 +1,120 @@
-# ASP.NET Docker Sample
+# ASP.NET Core Docker Sample
 
-This [sample](Dockerfile) demonstrates how to use ASP.NET and Docker together.
+This sample demonstrates how to build container images for ASP.NET Core web apps. See [.NET Docker Samples](../README.md) for more samples.
 
-The sample builds the application in a container based on the larger [.NET Framework SDK Docker image](https://hub.docker.com/_/microsoft-dotnet-framework-sdk/). It builds the application and then copies the final build result into a Docker image based on the smaller [ASP.NET Runtime Docker image](https://hub.docker.com/_/microsoft-dotnet-framework-aspnet/). It uses Docker [multi-stage build](https://github.com/dotnet/announcements/issues/18) and [multi-arch tags](https://github.com/dotnet/announcements/issues/14).
+> Note: .NET 8 container images use port `8080`, by default. Previous .NET versions used port `80`. The instructions for the sample assume the use of port `8080`.
 
-This sample requires the [Docker client](https://store.docker.com/editions/community/docker-ce-desktop-windows).
+## Run the sample image
 
-## Try a pre-built ASP.NET Docker Image
-
-You can quickly run a container with a pre-built [sample ASP.NET Docker image](https://hub.docker.com/_/microsoft-dotnet-framework-samples/), based on the [ASP.NET Docker sample].
-
-Type the following [Docker](https://www.docker.com/products/docker) command:
+You can start by launching a sample from our [container registry](https://mcr.microsoft.com/) and access it in your web browser at `http://localhost:8000`.
 
 ```console
-docker run --name aspnet_sample --rm -it -p 8000:80 mcr.microsoft.com/dotnet/framework/samples:aspnetapp
+docker run --rm -it -p 8000:8080 -e ASPNETCORE_HTTP_PORTS=8080 mcr.microsoft.com/dotnet/samples:aspnetapp
 ```
 
-After the application starts, navigate to `http://localhost:8000` in your web browser. You need to navigate to the application via IP address instead of `localhost` for earlier Windows versions, which is demonstrated in [View the ASP.NET app in a running container on Windows](https://github.com/microsoft/dotnet-framework-docker/blob/main/samples/aspnetapp/README.md#view-the-aspnet-app-in-a-running-container-on-windows).
+You can also call an endpoint that the app exposes:
 
-## Getting the sample
-
-The easiest way to get the sample is by cloning the samples repository with [git](https://git-scm.com/downloads), using the following instructions:
-
-```console
-git clone https://github.com/microsoft/dotnet-framework-docker/
+```bash
+$ curl http://localhost:8000/Environment
+{"runtimeVersion":".NET 8.0.0-preview.6.23329.7","osVersion":"Ubuntu 22.04.2 LTS","osArchitecture":"Arm64","user":"app","processorCount":4,"totalAvailableMemoryBytes":4124442624,"memoryLimit":0,"memoryUsage":31518720,"hostName":"78e2b2cfc0e8"}
 ```
 
-You can also [download the repository as a zip](https://github.com/microsoft/dotnet-framework-docker/archive/main.zip).
+This container image is built with [Ubuntu Chiseled](https://devblogs.microsoft.com/dotnet/dotnet-6-is-now-in-ubuntu-2204/#net-in-chiseled-ubuntu-containers), with [Dockerfile](Dockerfile.chiseled-composite).
 
-## Build and run the sample with Docker
+## Change port
 
-You can build and run the sample in Docker using the following commands. The instructions assume that you are in the root of the repository.
+You can change the port ASP.NET Core uses with one of the following environment variables. However, port `8080` (set by default) is recommended.
+
+The following examples change the port to port `80`.
+
+Supported with .NET 8+:
+
+```bash
+ASPNETCORE_HTTP_PORTS=80
+```
+
+Supported with .NET Core 1.0+
+
+```bash
+ASPNETCORE_URLS=http://+:80 
+```
+
+Note: `ASPNETCORE_URLS` overwrites `ASPNETCORE_HTTP_PORTS` if set.
+
+These environment variables are used in [.NET 8](https://github.com/dotnet/dotnet-docker/blob/6da64f31944bb16ecde5495b6a53fc170fbe100d/src/runtime-deps/8.0/bookworm-slim/amd64/Dockerfile#L7C5-L7C31) and [.NET 6](https://github.com/dotnet/dotnet-docker/blob/6da64f31944bb16ecde5495b6a53fc170fbe100d/src/runtime-deps/6.0/bookworm-slim/amd64/Dockerfile#L5) Dockerfiles, respectively.
+
+## Build image
+
+You can built an image using one of the provided Dockerfiles.
 
 ```console
-cd samples
-cd aspnetapp
 docker build --pull -t aspnetapp .
-docker run --name aspnet_sample --rm -it -p 8000:80 aspnetapp
+docker run --rm -it -p 8000:8080 -e ASPNETCORE_HTTP_PORTS=8080 aspnetapp
 ```
 
-You should see the following console output as the application starts.
+You should see the following console output as the application starts:
 
 ```console
-C:\git\dotnet-framework-docker\samples\aspnetapp>docker run --name aspnet_sample --rm -it -p 8000:80 aspnetapp
-Service 'w3svc' has been stopped
-
-Service 'w3svc' started
+> docker run --rm -it -p 8000:8080 -e ASPNETCORE_HTTP_PORTS=8080 aspnetapp
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://[::]:8080
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
 ```
 
-After the application starts, navigate to `http://localhost:8000` in your web browser. You need to navigate to the application via IP address instead of `localhost` for earlier Windows versions, which is demonstrated in [View the ASP.NET app in a running container on Windows](https://github.com/microsoft/dotnet-framework-docker/blob/main/samples/aspnetapp/README.md#view-the-aspnet-app-in-a-running-container-on-windows).
+After the application starts, navigate to `http://localhost:8000` in your web browser. You can also view the ASP.NET Core site running in the container from another machine with a local IP address such as `http://192.168.1.18:8000`.
 
-Note: The `-p` argument maps port 8000 on your local machine to port 80 in the container (the form of the port mapping is `host:container`). See the [Docker run reference](https://docs.docker.com/engine/reference/commandline/run/) for more information on commandline parameters.
+> Note: ASP.NET Core apps (in official images) listen to [port 8080 by default](https://github.com/dotnet/dotnet-docker/blob/6da64f31944bb16ecde5495b6a53fc170fbe100d/src/runtime-deps/8.0/bookworm-slim/amd64/Dockerfile#L7), starting with .NET 8. The [`-p` argument](https://docs.docker.com/engine/reference/commandline/run/#publish) in these examples maps host port `8000` to container port `8080` (`host:container` mapping). The container will not be accessible without this mapping. ASP.NET Core can be [configured to listen on a different or additional port](https://learn.microsoft.com/aspnet/core/fundamentals/servers/kestrel/endpoints).
 
-### View the ASP.NET app in a running container on Windows
+You can see the app running via `docker ps`.
 
-After the application starts, navigate to the container IP (as opposed to http://localhost) in your web browser with the the following instructions:
+```bash
+$ docker ps
+CONTAINER ID   IMAGE                                        COMMAND         CREATED          STATUS                    PORTS                  NAMES
+d79edc6bfcb6   mcr.microsoft.com/dotnet/samples:aspnetapp   "./aspnetapp"   35 seconds ago   Up 34 seconds (healthy)   0.0.0.0:8080->8080/tcp   nice_curran
+```
 
-1. Open up another command prompt.
-1. Run `docker exec aspnet_sample ipconfig`.
-1. Copy the container IP address and paste into your browser (for example, `172.29.245.43`).
+You may notice that the sample includes a [health check](https://learn.microsoft.com/aspnet/core/host-and-deploy/health-checks), indicated in the "STATUS" column.
 
-See the following example of how to get the IP address of a running Windows container.
+## Build image with the SDK
+
+The easiest way to [build images is with the SDK](https://github.com/dotnet/sdk-container-builds).
 
 ```console
-C:\git\dotnet-framework-docker\samples\aspnetapp>docker exec aspnet_sample ipconfig
-
-Windows IP Configuration
-
-
-Ethernet adapter Ethernet:
-
-   Connection-specific DNS Suffix  . : contoso.com
-   Link-local IPv6 Address . . . . . : fe80::1967:6598:124:cfa3%4
-   IPv4 Address. . . . . . . . . . . : 172.29.245.43
-   Subnet Mask . . . . . . . . . . . : 255.255.240.0
-   Default Gateway . . . . . . . . . : 172.29.240.1
+dotnet publish /p:PublishProfile=DefaultContainer
 ```
 
-Note: [`docker exec`](https://docs.docker.com/engine/reference/commandline/exec/) supports identifying containers with name or hash. The container name is used in the preceding instructions. `docker exec` runs a new command (as opposed to the [entrypoint](https://docs.docker.com/engine/reference/builder/#entrypoint)) in a running container.
-
-Some people prefer using `docker inspect` for this same purpose, as demonstrated in the following example.
+That command can be further customized to use a different base image and publish to a container registry. You must first use `docker login` to login to the registry.
 
 ```console
-C:\git\dotnet-framework-docker\samples\aspnetapp>docker inspect -f "{{ .NetworkSettings.Networks.nat.IPAddress }}" aspnetcore_sample
-172.25.157.148
+dotnet publish /p:PublishProfile=DefaultContainer /p:ContainerBaseImage=mcr.microsoft.com/dotnet/aspnet:8.0-jammy-chiseled /p:ContainerRegistry=docker.io /p:ContainerRepository=youraccount/aspnetapp
 ```
 
-## Deploying to Production vs Development
+## Supported Linux distros
 
-The approach for running containers differs between development and production. 
+The .NET Team publishes images for [multiple distros](../../documentation/supported-platforms.md).
 
-In production, you will typically start your container with `docker run -d`. This argument starts the container as a service, without any console interaction. You then interact with it through other Docker commands or APIs exposed by the containerized application.
+Samples are provided for:
 
-In development, you will typically start containers with `docker run --rm -it`. These arguments enable you to see a console (important when there are errors), terminate the container with `CTRL-C` and cleans up all container resources when the container is termiantes. You also typically don't mind blocking the console. This approach is demonstrated in prior examples in this document.
+- [Alpine](Dockerfile.alpine)
+- [Alpine with Composite ready-to-run image](Dockerfile.alpine-composite)
+- [Alpine with ICU installed](Dockerfile.alpine-icu)
+- [Debian](Dockerfile.debian)
+- [Ubuntu](Dockerfile.ubuntu)
+- [Ubuntu Chiseled](Dockerfile.chiseled)
+- [Ubuntu Chiseled with Composite ready-to-run image](Dockerfile.chiseled-composite)
 
-We recommend that you do not use `--rm` in production. It cleans up container resources, preventing you from collecting logs that may have been captured in a container that has either stopped or crashed.
+## Supported Windows versions
 
-## Build the sample locally
+The .NET Team publishes images for [multiple Windows versions](../../documentation/supported-platforms.md). You must have [Windows containers enabled](https://docs.docker.com/docker-for-windows/#switch-between-windows-and-linux-containers) to use these images.
 
-You can build this [.NET Framework 4.8](https://www.microsoft.com/net/download/dotnet-framework-runtime/net48) application locally with MSBuild and [NuGet](https://www.nuget.org/downloads) using the following instructions. The instructions assume that you are in the root of the repository and using the `Developer Command Prompt for VS 2019`.
+Samples are provided for
 
-You must have the [.NET Framework 4.8 targeting pack](http://go.microsoft.com/fwlink/?LinkId=2085167) installed.
+- [Nano Server](Dockerfile.nanoserver)
+- [Windows Server Core](Dockerfile.windowsservercore)
+- [Windows Server Core with IIS](Dockerfile.windowsservercore-iis)
 
-```console
-cd samples
-cd aspnetapp
-nuget restore
-msbuild
-```
+Windows variants of the sample can be pulled via one the following registry addresses:
 
-You can test and debug the application with [Visual Studio 2019](https://visualstudio.microsoft.com/vs/).
-
-## .NET Resources
-
-More Samples
-
-* [.NET Framework Docker Samples](../README.md)
-* [.NET Docker Samples](https://github.com/dotnet/dotnet-docker/blob/main/samples/README.md)
-
-Docs and More Information:
-
-* [.NET Docs](https://docs.microsoft.com/dotnet/)
-* [ASP.NET Docs](https://docs.microsoft.com/aspnet/)
-* [dotnet/core](https://github.com/dotnet/core) for starting with .NET on GitHub.
-* [dotnet/announcements](https://github.com/dotnet/announcements/issues) for .NET announcements.
-
-## Related Docker Hub Repos
-
-.NET Framework:
-
-* [dotnet/framework/sdk](https://hub.docker.com/_/microsoft-dotnet-framework-sdk/): .NET Framework SDK
-* [dotnet/framework/aspnet](https://hub.docker.com/_/microsoft-dotnet-framework-aspnet/): ASP.NET Web Forms and MVC
-* [dotnet/framework/runtime](https://hub.docker.com/_/microsoft-dotnet-framework-runtime/): .NET Framework Runtime
-* [dotnet/framework/wcf](https://hub.docker.com/_/microsoft-dotnet-framework-wcf/): Windows Communication Foundation (WCF)
-* [dotnet/framework/samples](https://hub.docker.com/_/microsoft-dotnet-framework-samples/): .NET Framework, ASP.NET and WCF Samples
-
-.NET:
-
-* [dotnet](https://hub.docker.com/_/microsoft-dotnet/): .NET
-* [dotnet/samples](https://hub.docker.com/_/microsoft-dotnet-samples/): .NET Samples
-* [dotnet-nightly](https://hub.docker.com/_/microsoft-dotnet-nightly/): .NET (Preview)
-# aspdotnetapp-docker-jenkins-pileline-azure
+- `mcr.microsoft.com/dotnet/samples:aspnetapp-nanoserver-1809`
+- `mcr.microsoft.com/dotnet/samples:aspnetapp-nanoserver-ltsc2022`
