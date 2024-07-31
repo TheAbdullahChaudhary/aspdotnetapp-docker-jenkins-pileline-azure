@@ -1,120 +1,48 @@
-# ASP.NET Core Docker Sample
+# End-to-End Continuous Integration and Continuous Deployment based on GitOps using GitHub Actions and Argo CD 🚀
 
-This sample demonstrates how to build container images for ASP.NET Core web apps. See [.NET Docker Samples](../README.md) for more samples.
+This repository contains the source code for the **End-to-End Continuous Integration and Continuous Deployment based on GitOps** project.
 
-> Note: .NET 8 container images use port `8080`, by default. Previous .NET versions used port `80`. The instructions for the sample assume the use of port `8080`.
+## Architecture Overview 📚
 
-## Run the sample image
+We are going to build a CI/CD pipeline that will be triggered by a push to the main branch of the repository. **The pipeline will build the application, run the tests, and deploy the application to a Kubernetes cluster**. The pipeline will be implemented using GitHub Actions and ArgoCD.
 
-You can start by launching a sample from our [container registry](https://mcr.microsoft.com/) and access it in your web browser at `http://localhost:8000`.
+**The architecture of the project is explained below:**
 
-```console
-docker run --rm -it -p 8000:8080 -e ASPNETCORE_HTTP_PORTS=8080 mcr.microsoft.com/dotnet/samples:aspnetapp
-```
+First, we have a **GitHub repository that contains the source code of the application**. The repository is connected to GitHub Actions, which will be used to build and deploy the application. The GitHub Actions workflow will be triggered by a push to the main branch of the repository. **The workflow will build the application, run the tests, and Push the Docker image to Docker Hub. And then It will Update the Image tag in the Manifest Repository**. The Manifest Repository is a separate GitHub repository that contains the Kubernetes manifests for the application. And our Argo CD will be watching this repository for changes. **Once the image tag is updated in the Manifest Repository, Argo CD will automatically deploy the new version of the application to the Kubernetes cluster**.
 
-You can also call an endpoint that the app exposes:
+## Architecture Diagram 📊
 
-```bash
-$ curl http://localhost:8000/Environment
-{"runtimeVersion":".NET 8.0.0-preview.6.23329.7","osVersion":"Ubuntu 22.04.2 LTS","osArchitecture":"Arm64","user":"app","processorCount":4,"totalAvailableMemoryBytes":4124442624,"memoryLimit":0,"memoryUsage":31518720,"hostName":"78e2b2cfc0e8"}
-```
+![Argo CD Pipeline](https://github.com/mathesh-me/python-flask-app/assets/144098846/ea1757e8-0c61-47e9-9018-8530cfb3e879)
 
-This container image is built with [Ubuntu Chiseled](https://devblogs.microsoft.com/dotnet/dotnet-6-is-now-in-ubuntu-2204/#net-in-chiseled-ubuntu-containers), with [Dockerfile](Dockerfile.chiseled-composite).
 
-## Change port
+## Prerequisites 📋
 
-You can change the port ASP.NET Core uses with one of the following environment variables. However, port `8080` (set by default) is recommended.
+- `A GitHub account`
+- `A Docker Hub account`
+- `A Kubernetes cluster`
+- `Argo CD installed on the Kubernetes cluster`
 
-The following examples change the port to port `80`.
+## Usage 🛠️
 
-Supported with .NET 8+:
+1. Fork this repository and Manifest Repository to your GitHub account.
+2. Add the following secrets to your GitHub repository:
+   - `DOCKER_USERNAME`: Your Docker Hub username
+   - `DOCKER_PASSWORD`: Your Docker Hub password
+   - `CI_TOKEN`: A personal access token with the `repo` scope to access the Manifest Repository
+3. Update your Argo CD application to watch the Manifest Repository.
+4. Push a change to the main branch of the repository to trigger the CI/CD pipeline.
 
-```bash
-ASPNETCORE_HTTP_PORTS=80
-```
+You can Check out my [Medium Article]() for detailed instructions on **How to set up the CI/CD pipeline and deploy the application to a Kubernetes cluster based on GitOps**.
 
-Supported with .NET Core 1.0+
+## License 📄
 
-```bash
-ASPNETCORE_URLS=http://+:80 
-```
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-Note: `ASPNETCORE_URLS` overwrites `ASPNETCORE_HTTP_PORTS` if set.
+## Contributing 🤝
 
-These environment variables are used in [.NET 8](https://github.com/dotnet/dotnet-docker/blob/6da64f31944bb16ecde5495b6a53fc170fbe100d/src/runtime-deps/8.0/bookworm-slim/amd64/Dockerfile#L7C5-L7C31) and [.NET 6](https://github.com/dotnet/dotnet-docker/blob/6da64f31944bb16ecde5495b6a53fc170fbe100d/src/runtime-deps/6.0/bookworm-slim/amd64/Dockerfile#L5) Dockerfiles, respectively.
+Contributions are welcome! If you have any suggestions or run into any issues, feel free to open an issue or create a pull request.
 
-## Build image
+## Author 🙋‍♂
 
-You can built an image using one of the provided Dockerfiles.
-
-```console
-docker build --pull -t aspnetapp .
-docker run --rm -it -p 8000:8080 -e ASPNETCORE_HTTP_PORTS=8080 aspnetapp
-```
-
-You should see the following console output as the application starts:
-
-```console
-> docker run --rm -it -p 8000:8080 -e ASPNETCORE_HTTP_PORTS=8080 aspnetapp
-info: Microsoft.Hosting.Lifetime[14]
-      Now listening on: http://[::]:8080
-info: Microsoft.Hosting.Lifetime[0]
-      Application started. Press Ctrl+C to shut down.
-```
-
-After the application starts, navigate to `http://localhost:8000` in your web browser. You can also view the ASP.NET Core site running in the container from another machine with a local IP address such as `http://192.168.1.18:8000`.
-
-> Note: ASP.NET Core apps (in official images) listen to [port 8080 by default](https://github.com/dotnet/dotnet-docker/blob/6da64f31944bb16ecde5495b6a53fc170fbe100d/src/runtime-deps/8.0/bookworm-slim/amd64/Dockerfile#L7), starting with .NET 8. The [`-p` argument](https://docs.docker.com/engine/reference/commandline/run/#publish) in these examples maps host port `8000` to container port `8080` (`host:container` mapping). The container will not be accessible without this mapping. ASP.NET Core can be [configured to listen on a different or additional port](https://learn.microsoft.com/aspnet/core/fundamentals/servers/kestrel/endpoints).
-
-You can see the app running via `docker ps`.
-
-```bash
-$ docker ps
-CONTAINER ID   IMAGE                                        COMMAND         CREATED          STATUS                    PORTS                  NAMES
-d79edc6bfcb6   mcr.microsoft.com/dotnet/samples:aspnetapp   "./aspnetapp"   35 seconds ago   Up 34 seconds (healthy)   0.0.0.0:8080->8080/tcp   nice_curran
-```
-
-You may notice that the sample includes a [health check](https://learn.microsoft.com/aspnet/core/host-and-deploy/health-checks), indicated in the "STATUS" column.
-
-## Build image with the SDK
-
-The easiest way to [build images is with the SDK](https://github.com/dotnet/sdk-container-builds).
-
-```console
-dotnet publish /p:PublishProfile=DefaultContainer
-```
-
-That command can be further customized to use a different base image and publish to a container registry. You must first use `docker login` to login to the registry.
-
-```console
-dotnet publish /p:PublishProfile=DefaultContainer /p:ContainerBaseImage=mcr.microsoft.com/dotnet/aspnet:8.0-jammy-chiseled /p:ContainerRegistry=docker.io /p:ContainerRepository=youraccount/aspnetapp
-```
-
-## Supported Linux distros
-
-The .NET Team publishes images for [multiple distros](../../documentation/supported-platforms.md).
-
-Samples are provided for:
-
-- [Alpine](Dockerfile.alpine)
-- [Alpine with Composite ready-to-run image](Dockerfile.alpine-composite)
-- [Alpine with ICU installed](Dockerfile.alpine-icu)
-- [Debian](Dockerfile.debian)
-- [Ubuntu](Dockerfile.ubuntu)
-- [Ubuntu Chiseled](Dockerfile.chiseled)
-- [Ubuntu Chiseled with Composite ready-to-run image](Dockerfile.chiseled-composite)
-
-## Supported Windows versions
-
-The .NET Team publishes images for [multiple Windows versions](../../documentation/supported-platforms.md). You must have [Windows containers enabled](https://docs.docker.com/docker-for-windows/#switch-between-windows-and-linux-containers) to use these images.
-
-Samples are provided for
-
-- [Nano Server](Dockerfile.nanoserver)
-- [Windows Server Core](Dockerfile.windowsservercore)
-- [Windows Server Core with IIS](Dockerfile.windowsservercore-iis)
-
-Windows variants of the sample can be pulled via one the following registry addresses:
-
-- `mcr.microsoft.com/dotnet/samples:aspnetapp-nanoserver-1809`
-- `mcr.microsoft.com/dotnet/samples:aspnetapp-nanoserver-ltsc2022`
+- [Mathesh M](https://www.linkedin.com/in/mathesh-me/) on LinkedIn.
+- You Can also check out my [Medium](https://medium.com/@mathesh-me) for articles on DevOps Tools and Technologies.️
