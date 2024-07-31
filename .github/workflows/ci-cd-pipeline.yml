@@ -1,31 +1,73 @@
-name: Deploy to EC2
+name: Build and Deploy Docker Image
 
 on:
   push:
     branches:
-      - main  # Change to your branch
+      - main
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up SSH key
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.docker/cache
+            ~/.docker/buildx
+          key: ${{ runner.os }}-docker-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-docker-
+
+      - name: Build Docker image
         run: |
+          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/aspdotnetapp:latest .
+
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKER_HUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin
+
+      - name: Push Docker image to Docker Hub
+        run: |
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/aspdotnetapp:latest
+
+      - name: Deploy Docker image to AWS EC2
+        env:
+          DEV_EC2_SSH_PRIVATE_KEY: ${{ secrets.DEV_EC2_SSH_PRIVATE_KEY }}
+        run: |
+          # Install SSH client
+          sudo apt-get install -y openssh-client
+
+          # Create SSH key directory
           mkdir -p ~/.ssh
-          echo "${{ secrets.DEV_EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+
+          # Write SSH private key
+          echo "$DEV_EC2_SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
-      - name: Add EC2 Host to Known Hosts
-        run: ssh-keyscan -H ec2-54-190-228-137.us-west-2.compute.amazonaws.com >> ~/.ssh/known_hosts
+          # Add EC2 host to known hosts
+          ssh-keyscan -H your.ec2.instance.ip >> ~/.ssh/known_hosts
 
-      - name: Deploy to EC2
-        run: |
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@ec2-54-190-228-137.us-west-2.compute.amazonaws.com << 'EOF'
-            # Run your commands here
-            docker ps
-            # Example deployment commands
+          # Connect to EC2 instance and deploy Docker image
+          ssh -o StrictHostKeyChecking=no ec2-user@your.ec2.instance.ip << 'EOF'
+            # Update Docker on EC2
+            sudo yum update -y
+            sudo yum install -y docker
+            sudo service docker start
+
+            # Pull the latest Docker image
+            docker pull ${{ secrets.DOCKER_HUB_USERNAME }}/aspdotnetapp:latest
+
+            # Stop and remove existing container (if any)
+            docker stop aspdotnetapp || true
+            docker rm aspdotnetapp || true
+
+            # Run the new container
+            docker run -d --name aspdotnetapp -p 80:80 ${{ secrets.DOCKER_HUB_USERNAME }}/aspdotnetapp:latest
           EOF
