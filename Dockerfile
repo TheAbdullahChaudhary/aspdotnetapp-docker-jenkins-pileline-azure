@@ -6,6 +6,6 @@ COPY . /app
 
 RUN pip install -r requirements.txt
 
-EXPOSE 8081
+EXPOSE 80
 
 ENTRYPOINT ["python" , "app.py"]
