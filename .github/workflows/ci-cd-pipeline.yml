@@ -49,10 +49,49 @@ jobs:
           sudo docker run -d --name aspdotnetapp -p 8080:8080 ${{ secrets.DOCKER_USERNAME }}/aspdotnetapp:latest
         EOF
 
-  manual-approval-and-deploy-prod:
+  approval:
     runs-on: ubuntu-latest
     needs: build-and-deploy-dev
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.approve == 'true'
+
+    steps:
+    - name: Awaiting manual approval
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const { Octokit } = require("@octokit/rest");
+          const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
+          const issue_number = context.payload.pull_request ? context.payload.pull_request.number : context.issue.number;
+          const owner = context.repo.owner;
+          const repo = context.repo.repo;
+
+          const comment = await octokit.issues.createComment({
+            owner,
+            repo,
+            issue_number,
+            body: "Please approve this deployment by adding the `approved` label."
+          });
+
+          while (true) {
+            await new Promise(resolve => setTimeout(resolve, 30000));
+            const { data: issue } = await octokit.issues.get({
+              owner,
+              repo,
+              issue_number
+            });
+
+            if (issue.labels.some(label => label.name === 'approved')) {
+              console.log('Deployment approved');
+              break;
+            }
+
+            console.log('Waiting for approval...');
+          }
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  manual-approval-and-deploy-prod:
+    runs-on: ubuntu-latest
+    needs: approval
 
     steps:
     - name: Setup SSH for PROD
