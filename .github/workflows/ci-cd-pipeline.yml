@@ -54,40 +54,21 @@ jobs:
     needs: build-and-deploy-dev
 
     steps:
-    - name: Awaiting manual approval
-      uses: actions/github-script@v6
+    - name: Send approval request
+      id: send_approval_request
+      uses: peter-evans/create-issue-from-file@v2
       with:
-        script: |
-          const owner = context.repo.owner;
-          const repo = context.repo.repo;
-          const issue_number = 123; // Replace with your issue number
+        title: 'Deployment Approval Request'
+        assignees: 'theabdullahchaudhary'  # Replace with your GitHub username
+        labels: 'approval'
+        body: |
+          Please approve this deployment by commenting :+1: on this issue.
 
-          // Create a comment requesting approval
-          await github.rest.issues.createComment({
-            owner,
-            repo,
-            issue_number: issue_number,
-            body: "Please approve this deployment by adding the `approved` label."
-          });
-
-          // Check for approval label every 30 seconds
-          while (true) {
-            await new Promise(resolve => setTimeout(resolve, 30000));
-            const { data: issue } = await github.rest.issues.get({
-              owner,
-              repo,
-              issue_number: issue_number
-            });
-
-            if (issue.labels.some(label => label.name === 'approved')) {
-              console.log('Deployment approved');
-              break;
-            }
-
-            console.log('Waiting for approval...');
-          }
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Wait for approval
+      uses: andstor/wait-for-approval@v1
+      with:
+        issue-number: ${{ steps.send_approval_request.outputs.number }}
+        repository-token: ${{ secrets.GITHUB_TOKEN }}
 
   manual-approval-and-deploy-prod:
     runs-on: ubuntu-latest
