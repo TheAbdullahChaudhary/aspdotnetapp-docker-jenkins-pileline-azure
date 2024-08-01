@@ -58,12 +58,12 @@ jobs:
       uses: actions/github-script@v6
       with:
         script: |
-          const issue_number = context.payload.pull_request ? context.payload.pull_request.number : context.issue.number;
           const owner = context.repo.owner;
           const repo = context.repo.repo;
+          const issue_number = context.issue.number;
 
           // Create a comment requesting approval
-          await github.issues.createComment({
+          await github.rest.issues.createComment({
             owner,
             repo,
             issue_number,
@@ -73,7 +73,7 @@ jobs:
           // Check for approval label every 30 seconds
           while (true) {
             await new Promise(resolve => setTimeout(resolve, 30000));
-            const { data: issue } = await github.issues.get({
+            const { data: issue } = await github.rest.issues.get({
               owner,
               repo,
               issue_number
