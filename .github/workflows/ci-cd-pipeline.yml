@@ -60,13 +60,13 @@ jobs:
         script: |
           const owner = context.repo.owner;
           const repo = context.repo.repo;
-          const issue_number = context.issue.number;
+          const issue_number = 123; // Replace with your issue number
 
           // Create a comment requesting approval
           await github.rest.issues.createComment({
             owner,
             repo,
-            issue_number,
+            issue_number: issue_number,
             body: "Please approve this deployment by adding the `approved` label."
           });
 
@@ -76,7 +76,7 @@ jobs:
             const { data: issue } = await github.rest.issues.get({
               owner,
               repo,
-              issue_number
+              issue_number: issue_number
             });
 
             if (issue.labels.some(label => label.name === 'approved')) {
