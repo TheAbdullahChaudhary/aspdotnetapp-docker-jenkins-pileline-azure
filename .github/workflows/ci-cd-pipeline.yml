@@ -1,79 +1,84 @@
-name: Build, Deploy to Dev, and Deploy to Prod
+name: Build and Deploy Docker Image
 
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   build-and-deploy-dev:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
-
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v2
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
-
-    - name: Build Docker image
-      run: |
-        docker build -t ${{ secrets.DOCKER_USERNAME }}/aspdotnetapp:latest .
-
-    - name: Push Docker image to Docker Hub
+	@@ -31,15 +30,18 @@ jobs:
       run: |
         docker push ${{ secrets.DOCKER_USERNAME }}/aspdotnetapp:latest
-
-    - name: Setup SSH for Dev
+    - name: Setup SSH for DEV
       run: |
         mkdir -p ~/.ssh
         echo "${{ secrets.DEV_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan -H ${{ secrets.DEV_EC2_HOST }} >> ~/.ssh/known_hosts
-
-    - name: Deploy to Dev AWS EC2
+    - name: Deploy to AWS EC2 DEV
       env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_REGION: ${{ secrets.AWS_REGION }}
         DEV_EC2_HOST: ${{ secrets.DEV_EC2_HOST }}
       run: |
         ssh -o StrictHostKeyChecking=no ubuntu@$DEV_EC2_HOST << 'EOF'
-          sudo docker pull ${{ secrets.DOCKER_USERNAME }}/aspdotnetapp:latest
-          sudo docker stop aspdotnetapp || true
-          sudo docker rm aspdotnetapp || true
+	@@ -49,60 +51,24 @@ jobs:
           sudo docker run -d --name aspdotnetapp -p 8080:8080 ${{ secrets.DOCKER_USERNAME }}/aspdotnetapp:latest
         EOF
-
-  deploy-prod:
-    needs: build-and-deploy-dev
+  approval:
     runs-on: ubuntu-latest
-    environment: production
-    
+    needs: build-and-deploy-dev
+
     steps:
-    - name: Setup SSH for Prod
+    - name: Awaiting manual approval
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const owner = context.repo.owner;
+          const repo = context.repo.repo;
+          const issue_number = 123; // Replace with your issue number
+          // Create a comment requesting approval
+          await github.rest.issues.createComment({
+            owner,
+            repo,
+            issue_number: issue_number,
+            body: "Please approve this deployment by adding the `approved` label."
+          });
+          // Check for approval label every 30 seconds
+          while (true) {
+            await new Promise(resolve => setTimeout(resolve, 30000));
+            const { data: issue } = await github.rest.issues.get({
+              owner,
+              repo,
+              issue_number: issue_number
+            });
+            if (issue.labels.some(label => label.name === 'approved')) {
+              console.log('Deployment approved');
+              break;
+            }
+            console.log('Waiting for approval...');
+          }
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  manual-approval-and-deploy-prod:
+    runs-on: ubuntu-latest
+    needs: approval
+
+    steps:
+    - name: Setup SSH for PROD
       run: |
         mkdir -p ~/.ssh
         echo "${{ secrets.PROD_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan -H ${{ secrets.PROD_EC2_HOST }} >> ~/.ssh/known_hosts
-
-    - name: Deploy to Prod AWS EC2
+    - name: Deploy to AWS EC2 PROD
       env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_REGION: ${{ secrets.AWS_REGION }}
         PROD_EC2_HOST: ${{ secrets.PROD_EC2_HOST }}
       run: |
         ssh -o StrictHostKeyChecking=no ubuntu@$PROD_EC2_HOST << 'EOF'
-          sudo docker pull ${{ secrets.DOCKER_USERNAME }}/aspdotnetapp:latest
-          sudo docker stop aspdotnetapp || true
-          sudo docker rm aspdotnetapp || true
-          sudo docker run -d --name aspdotnetapp -p 8080:8080 ${{ secrets.DOCKER_USERNAME }}/aspdotnetapp:latest
-        EOF
